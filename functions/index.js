@@ -9,7 +9,7 @@ exports.categorizedContent = functions.firestore
     .onCreate((snap, context) => {
 
         console.log('Trigger fired!');
-        
+
         // Get an object representing the document.
         // e.g. {'name': 'Marie', 'age': 66}
         const newValue = snap.data();
@@ -18,12 +18,6 @@ exports.categorizedContent = functions.firestore
         //const name = newValue.name;
  
         // perform desired operations ...
-     });
- 
 
-// // Create and Deploy Your First Cloud Functions
-// // https://firebase.google.com/docs/functions/write-firebase-functions
-//
-// exports.helloWorld = functions.https.onRequest((request, response) => {
-//  response.send("Hello from Firebase!");
-// });
+        return true;
+    });
