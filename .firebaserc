@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "staging": "coinverse-media-staging",
+    "default": "coinverse-media-staging"
+  }
+}
