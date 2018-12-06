@@ -1,3 +1,5 @@
 package-lock.json
 functions/node_modules
 .DS_Store
+functions/firebase-debug.log
+firebase-admin-staging.json
