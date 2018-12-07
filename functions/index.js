@@ -1,32 +1,22 @@
-const admin = require('firebase-admin');
-const functions = require('firebase-functions');
 const path = require('path');
 const os = require('os');
-const {Storage} = require('@google-cloud/storage');
-const projectId = 'coinverse-media-staging';
-const storage = new Storage({
-  projectId: projectId,
-});
-
 const fs = require('fs');
+const admin = require('firebase-admin');
+const functions = require('firebase-functions');
+const {Storage} = require('@google-cloud/storage');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
+const storage = new Storage({
+  projectId: 'coinverse-media-staging',
+});
 const client = new textToSpeech.TextToSpeechClient();
 
 admin.initializeApp();
 
-/*var gcs = gcloud.storage({
-    projectId: 'coinverse-media-staging',
-    keyFilename: '../firebase-admin-staging.json'
-});*/
-
-const text = 'Hello, world!';
-//TODO: Use SSML conversion.
+//TODO: Use SSML configuration.
 const request = {
-    input: {text: text},
-    // Select the language and SSML Voice Gender (optional)
-    voice: {languageCode: 'en-US', ssmlGender: 'NEUTRAL'},
-    // Select the type of audio encoding
+    input: {text: 'Hello, world!'},    
+    voice: {languageCode: 'en-US', ssmlGender: 'NEUTRAL'},    
     audioConfig: {audioEncoding: 'MP3'},
 }; 
 
@@ -35,7 +25,7 @@ const request = {
 exports.getAudiocast = functions.https.onCall((data, context) => {
 
     //TODO: Check if audiocast file exists from Cloud Storage.
-    var bucket = storage.bucket('gs://coinverse-media-staging.appspot.com/content/feeds/en-audio/');
+    var bucket = storage.bucket('gs://coinverse-media-staging.appspot.com');
     
     //TODO: If exists, return file path.
     //FIXME: bucket.exists
@@ -47,31 +37,26 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
           console.error('ERROR:', err);
           return;
         }
-
-        const fileName = (data.id + '.mp3');
-
+        var fileName = data.id + '.mp3'
         const tempFile = path.join(os.tmpdir(), fileName);
-
-        var mp3File = fs.writeFile(tempFile, response.auioContent, 'binary', err => {
+        fs.writeFile(tempFile, response.auioContent, 'binary', err => {
           if (err) {
             console.error('ERROR:', err);
             return;
           }
-          console.log('Audio content written to file: ' + data.id + '.mpeg');
-        });
-        
-        var filePathToUpload = path.join(os.tmpdir(), fileName)
+          console.log('Audio content written to file: ' + tempFile);
 
-        bucket.upload(filePathToUpload), function(err, file) {
-          if (!err) {
-            console.log('Audiocast uploaded!');
-          } else {
-            console.error('Audiocast upload error: ' + err.message);
-          }
-        };
-      
+          bucket.upload(tempFile, { destination: ("content/feeds/en-audio/" + fileName) }, (err, file) => {
+            if (!err) {
+              console.log('Audiocast uploaded!');
+            } else {
+              console.error('Audiocast upload error: ' + err.message);
+            }
+          });
+        });  
     });
 
+    //TODO: Pass back real path.
     return {
         filePath: "cloudStorage/someFilePath",
     };
