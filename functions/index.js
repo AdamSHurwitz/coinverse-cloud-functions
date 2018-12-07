@@ -23,41 +23,42 @@ const request = {
 //TODO: Version for Staging vs. Production.
 // Retrieve the audiocast Cloud Storage path.
 exports.getAudiocast = functions.https.onCall((data, context) => {
-
-    //TODO: Check if audiocast file exists from Cloud Storage.
     var bucket = storage.bucket('gs://coinverse-media-staging.appspot.com');
-    
-    //TODO: If exists, return file path.
-    //FIXME: bucket.exists
-    console.log("Search for:" + data.id + " Exists in Storage:" + bucket.exists)
 
-    //TODO: If doesn't exist, create audiocast, save to Cloud Storage, and return path
-    client.synthesizeSpeech(request, (err, response) => {
-        if (err) {
-          console.error('ERROR:', err);
-          return;
-        }
-        var fileName = data.id + '.mp3'
-        const tempFile = path.join(os.tmpdir(), fileName);
-        fs.writeFile(tempFile, response.auioContent, 'binary', err => {
-          if (err) {
-            console.error('ERROR:', err);
-            return;
-          }
-          console.log('Audio content written to file: ' + tempFile);
-
-          bucket.upload(tempFile, { destination: ("content/feeds/en-audio/" + fileName) }, (err, file) => {
+    //TODO: Check if file exists, return file path or create new file.
+    return client.synthesizeSpeech(request, (err, response) => {
+        if (!err) { 
+          var fileName = data.id + '.mp3'
+          const tempFile = path.join(os.tmpdir(), fileName);
+          return fs.writeFile(tempFile, response.auioContent, 'binary', err => {
             if (!err) {
-              console.log('Audiocast uploaded!');
+              console.log('Audio content written to file: ' + tempFile);
+              var filePath = "content/feeds/en-audio/" + fileName;
+              return bucket.upload(tempFile, { destination: (filePath) }, (err, file) => {
+                if (!err) {
+                  console.log('Audiocast uploaded!');
+                  return {
+                    filePath: filePath,
+                  };
+                } else {
+                  console.error('Audiocast upload error: ' + err.message);
+                  return {
+                    filePath: "AUDIO_UPLOAD_ERROR",
+                  };
+                }
+              });
             } else {
-              console.error('Audiocast upload error: ' + err.message);
+              console.error('Write file error:', err);
+              return {
+                filePath: "AUDIO_WRITE_FILE_ERROR",
+              };
             }
-          });
-        });  
+          }); 
+        } else {
+          console.error('ERROR:', err);
+          return {
+            filePath: "AUDIO_SYNTHESIZE_ERROR",
+          };
+        } 
     });
-
-    //TODO: Pass back real path.
-    return {
-        filePath: "cloudStorage/someFilePath",
-    };
 });
