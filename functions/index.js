@@ -14,19 +14,19 @@ const client = new textToSpeech.TextToSpeechClient();
 admin.initializeApp();
 
 //TODO: Version for Staging vs. Production.
-// Retrieve the audiocast Cloud Storage path.
+//TODO: Check if file exists, return file path or create new file.
+//TODO: Use SSML configuration. 
+
+// Converts and saves article text into audio.
 exports.getAudiocast = functions.https.onCall((data, context) => {
   const bucket = storage.bucket('gs://coinverse-media-staging.appspot.com');
   var fileName;
   var tempFile;
   var filePath;
 
-  //TODO: Check if file exists, return file path or create new file.
-
-  //TODO: Pass in content text.
-  //TODO: Use SSML configuration. 
+  console.log('Convert Article ' + data.id + ': ' + data.text)
   return client.synthesizeSpeech({
-    input: {text: 'Hello, world!'},    
+    input: {text: data.text},    
     voice: {languageCode: 'en-US', ssmlGender: 'NEUTRAL'},    
     audioConfig: {audioEncoding: 'MP3'},
   })
