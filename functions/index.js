@@ -1,6 +1,7 @@
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const util = require('util');
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
 const {Storage} = require('@google-cloud/storage');
@@ -26,16 +27,17 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
 
   console.log('Convert Article ' + data.id + ': ' + data.text)
   return client.synthesizeSpeech({
-    input: {text: data.text},    
-    voice: {languageCode: 'en-US', ssmlGender: 'NEUTRAL'},    
+    input: {text: data.text },
+    // Select the language and SSML Voice Gender (optional)
+    voice: {languageCode: 'en-US', ssmlGender: 'NEUTRAL'},
+    // Select the type of audio encoding
     audioConfig: {audioEncoding: 'MP3'},
   })
-  .then(responses => {
-    var response = responses[0]; 
-    console.log("Synthesize Speech: " + response.audioContent)   
+  .then(responses => { 
     fileName = data.id + '.mp3'
-    tempFile = path.join(os.tmpdir(), fileName);       
-    return fs.writeFile(tempFile, response.auioContent, 'binary')      
+    tempFile = path.join(os.tmpdir(), fileName);      
+    const writeFile = util.promisify(fs.writeFile);
+    return writeFile(tempFile, responses[0].audioContent, 'binary')
   })
   .catch(err => {
     console.error("Synthesize Speech Error: " + err);
@@ -43,7 +45,7 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
   .then(() => {
      console.log('Write Temporary Audio File: ' + tempFile);
      filePath = "content/feeds/en-audio/" + fileName;
-     return bucket.upload(tempFile, { destination: (filePath) })
+     return bucket.upload(tempFile, { destination: filePath })
    })
    .catch(err => {
      console.error("Write Temporary Audio File Error: " + err);
