@@ -11,6 +11,7 @@ const storage = new Storage({
   projectId: 'coinverse-media-staging',
 });
 const client = new textToSpeech.TextToSpeechClient();
+const charLimitError = "Error: 3 INVALID_ARGUMENT: 5000 characters limit exceeded."
 
 admin.initializeApp();
 
@@ -24,10 +25,11 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
   var fileName;
   var tempFile;
   var filePath;
+  var errorMessage;
 
   console.log('Convert Article ' + data.id + ': ' + data.text)
   return client.synthesizeSpeech({
-    input: {text: data.text },
+    input: { text: data.text },
     // Select the language and SSML Voice Gender (optional)
     voice: {languageCode: 'en-US', ssmlGender: 'NEUTRAL'},
     // Select the type of audio encoding
@@ -40,10 +42,12 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
     return writeFile(tempFile, responses[0].audioContent, 'binary')
   })
   .catch(err => {
-    console.error("Synthesize Speech Error: " + err);
+    if (err.toString() === charLimitError) {
+      errorMessage = "TTS_CHAR_LIMIT_ERROR";
+      console.error("Synthesize Speech: " + err);
+    }
   })
   .then(() => {
-     console.log('Write Temporary Audio File: ' + tempFile);
      filePath = "content/feeds/en-audio/" + fileName;
      return bucket.upload(tempFile, { destination: filePath })
    })
@@ -51,10 +55,12 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
      console.error("Write Temporary Audio File Error: " + err);
    })
    .then(() => {
-     console.log('Upload Audio to GCS: ' + filePath);
-     return { filePath: filePath }
+     return { 
+       filePath: filePath, 
+       error: errorMessage 
+      }
      })
    .catch(err => {
-      console.error('Upload Audio to GCS ERROR: ' + err);
+     console.error('Upload Audio to GCS Error: ' + err);
     });
 });
