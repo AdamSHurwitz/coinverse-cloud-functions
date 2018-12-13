@@ -12,8 +12,6 @@ const charLimitError = "Error: 3 INVALID_ARGUMENT: 5000 characters limit exceede
 
 admin.initializeApp();
 
-//TODO: Version for Staging vs. Production.
-//TODO: Check if file exists, return file path or create new file.
 //TODO: Use SSML configuration. 
 
 // Converts and saves article text into audio.
@@ -28,21 +26,32 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
     bucket = storage.bucket('gs://carpecoin-media-211903.appspot.com');    
   }
   
-  var fileName;
+  var fileName = data.id + '.mp3';
+  var filePath = "content/feeds/en-audio/" + fileName;
   var tempFile;
-  var filePath;
   var errorMessage;
 
-  console.log('Convert Article ' + data.id + ': ' + data.text)
-  return client.synthesizeSpeech({
-    input: { text: data.text },
-    // Select the language and SSML Voice Gender (optional)
-    voice: {languageCode: 'en-US', ssmlGender: 'NEUTRAL'},
-    // Select the type of audio encoding
-    audioConfig: {audioEncoding: 'MP3'},
+  return bucket.file(filePath).exists()
+  .then(currentData => {
+    var exists = currentData[0];
+    console.log("Article " + data.id + " exists: " + exists)
+    if (exists) {
+      return { 
+        filePath: filePath, 
+        error: errorMessage 
+       }
+    } else {
+      console.log('Convert Article ' + data.id + ': ' + data.text)
+      return client.synthesizeSpeech({
+        input: { text: data.text },
+        voice: {languageCode: 'en-US', ssmlGender: 'NEUTRAL'},
+        audioConfig: {audioEncoding: 'MP3'},
+      })
+    }
+  }).catch(err => {
+    console.error("Check if file exists error: " + err);
   })
   .then(responses => { 
-    fileName = data.id + '.mp3'
     tempFile = path.join(os.tmpdir(), fileName);      
     const writeFile = util.promisify(fs.writeFile);
     return writeFile(tempFile, responses[0].audioContent, 'binary')
@@ -54,19 +63,18 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
     }
   })
   .then(() => {
-     filePath = "content/feeds/en-audio/" + fileName;
-     return bucket.upload(tempFile, { destination: filePath })
-   })
-   .catch(err => {
-     console.error("Write Temporary Audio File Error: " + err);
-   })
-   .then(() => {
-     return { 
-       filePath: filePath, 
-       error: errorMessage 
-      }
-    })
-   .catch(err => {
-     console.error('Upload Audio to GCS Error: ' + err);
-    });
+    return bucket.upload(tempFile, { destination: filePath })
+  })
+  .catch(err => {
+    console.error("Write Temporary Audio File Error: " + err);
+  })
+  .then(() => {
+    return { 
+      filePath: filePath, 
+      error: errorMessage 
+    }
+  })
+  .catch(err => {
+    console.error('Upload Audio to GCS Error: ' + err);
+  });
 });
