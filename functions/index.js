@@ -7,9 +7,6 @@ const functions = require('firebase-functions');
 const {Storage} = require('@google-cloud/storage');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const storage = new Storage({
-  projectId: 'coinverse-media-staging',
-});
 const client = new textToSpeech.TextToSpeechClient();
 const charLimitError = "Error: 3 INVALID_ARGUMENT: 5000 characters limit exceeded."
 
@@ -21,7 +18,16 @@ admin.initializeApp();
 
 // Converts and saves article text into audio.
 exports.getAudiocast = functions.https.onCall((data, context) => {
-  const bucket = storage.bucket('gs://coinverse-media-staging.appspot.com');
+  var storage;
+  var bucket;
+  if (data.debugEnabled === true) {
+    storage = new Storage({ projectId: 'coinverse-media-staging' });
+    bucket = storage.bucket('gs://coinverse-media-staging.appspot.com');
+  } else {
+    storage = new Storage({ projectId: 'carpecoin-media-211903' });
+    bucket = storage.bucket('gs://carpecoin-media-211903.appspot.com');    
+  }
+  
   var fileName;
   var tempFile;
   var filePath;
@@ -59,7 +65,7 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
        filePath: filePath, 
        error: errorMessage 
       }
-     })
+    })
    .catch(err => {
      console.error('Upload Audio to GCS Error: ' + err);
     });
