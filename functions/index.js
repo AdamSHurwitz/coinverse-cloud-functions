@@ -24,12 +24,15 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
     bucket = storage.bucket('gs://carpecoin-media-211903.appspot.com');    
   }
 
-  var fileName = data.id + '.mp3';
-  var filePath = "content/feeds/en-audio/" + fileName;
-  var tempFile;
+  var textFileName = data.id + '.txt';
+  var textFilePath = "content/feeds/en/text/" + textFileName;
+  var audioFileName = data.id + '.mp3';
+  var audioFilePath = "content/feeds/en/audio/" + audioFileName;
+  var tempTextFile;
+  var tempAudioFile;
   var errorMessage;
 
-  return bucket.file(filePath).exists()
+  return bucket.file(audioFilePath).exists()
   .catch(err => {
     console.error("Check if file exists error: " + err);
   })
@@ -38,48 +41,66 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
     console.log("Article " + data.id + " exists: " + exists)
     if (exists) {
       return { 
-        filePath: filePath, 
+        filePath: audioFilePath, 
         error: errorMessage 
        }
     } else {
-      //TODO: Improve SSML.
-      console.log('Convert Article ' + data.id + ': ' + (new Speech()).say(data.text).ssml())
-      return new textToSpeech.TextToSpeechClient().synthesizeSpeech({
-        input: { ssml: (new Speech).say(data.text).ssml()},
-        voice: {
-          languageCode: 'en-GB',
-          name: 'en-GB-Wavenet-C',
-        },
-        audioConfig: {
-          audioEncoding: 'MP3',
-          pitch: "0.00",
-          speakingRate: "1.00"
-        },
+      tempTextFile = path.join(os.tmpdir(), textFileName); 
+      return bucket.file(textFilePath).download({
+        destination: tempTextFile,
       });
     }
-  }).catch(err => {
+  })
+  .catch(err => {
+    console.error("Download text file error: " + err);
+  })
+  .then(() => {
+    console.log('Text downloaded to', tempTextFile);
+    const readFile = util.promisify(fs.readFile);
+    return readFile(tempTextFile, 'utf8');
+  })
+  .catch(err => {
+    console.error("Read " + tempTextFile + ": " + err);
+  })
+  .then((readData) => {
+    console.log('Convert Article ' + data.id + ': ' + readData);
+    //TODO: Improve SSML.
+    return new textToSpeech.TextToSpeechClient().synthesizeSpeech({
+      input: { ssml: (new Speech).say(readData).ssml()},
+      voice: {
+        languageCode: 'en-GB',
+        name: 'en-GB-Wavenet-C',
+      },
+      audioConfig: {
+        audioEncoding: 'MP3',
+        pitch: "0.00",
+        speakingRate: "1.00"
+      },
+    });
+  })
+  .catch(err => {
     if (err.toString() === charLimitError) {
       errorMessage = "TTS_CHAR_LIMIT_ERROR";
     }
-    console.error("Synthesize Speech: " + err);
+    console.error("Synthesize Speech: " + err.toString());
   })
   .then(responses => { 
-    tempFile = path.join(os.tmpdir(), fileName);      
+    tempAudioFile = path.join(os.tmpdir(), audioFileName);      
     const writeFile = util.promisify(fs.writeFile);
-    return writeFile(tempFile, responses[0].audioContent, 'binary')
+    return writeFile(tempAudioFile, responses[0].audioContent, 'binary')
   })
   .catch(err => {
     console.error("Write Temporary Audio File Error: " + err);
   })
   .then(() => {
-    return bucket.upload(tempFile, { destination: filePath })
+    return bucket.upload(tempAudioFile, { destination: audioFilePath })
   })
   .catch(err => {
     console.error('Upload Audio to GCS Error: ' + err);
   })
   .then(() => {
     return { 
-      filePath: filePath, 
+      filePath: audioFilePath, 
       error: errorMessage 
     }
   })
