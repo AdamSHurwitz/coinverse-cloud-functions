@@ -24,6 +24,7 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
     bucket = storage.bucket('gs://carpecoin-media-211903.appspot.com');    
   }
 
+  var exists;
   var textFileName = data.id + '.txt';
   var textFilePath = "content/feeds/en/text/" + textFileName;
   var audioFileName = data.id + '.mp3';
@@ -37,7 +38,7 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
     console.error("Check if file exists error: " + err);
   })
   .then(currentData => {
-    var exists = currentData[0];
+    exists = currentData[0];
     console.log("Article " + data.id + " exists: " + exists)
     if (exists) {
       return { 
@@ -55,28 +56,36 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
     console.error("Download text file error: " + err);
   })
   .then(() => {
-    console.log('Text downloaded to', tempTextFile);
-    const readFile = util.promisify(fs.readFile);
-    return readFile(tempTextFile, 'utf8');
+    if (exists === false) {
+      console.log('Text downloaded to', tempTextFile);
+      const readFile = util.promisify(fs.readFile);
+      return readFile(tempTextFile, 'utf8');
+    } else {
+      throw new Error("Audiocast exists.")
+    }
   })
   .catch(err => {
     console.error("Read " + tempTextFile + ": " + err);
   })
   .then((readData) => {
-    console.log('Convert Article ' + data.id + ': ' + readData);
     //TODO: Improve SSML.
-    return new textToSpeech.TextToSpeechClient().synthesizeSpeech({
-      input: { ssml: (new Speech).say(readData).ssml()},
-      voice: {
-        languageCode: 'en-GB',
-        name: 'en-GB-Wavenet-C',
-      },
-      audioConfig: {
-        audioEncoding: 'MP3',
-        pitch: "0.00",
-        speakingRate: "1.00"
-      },
-    });
+    if (exists === false) {
+      console.log('Convert Article ' + data.id + ': ' + readData);
+      return new textToSpeech.TextToSpeechClient().synthesizeSpeech({
+        input: { ssml: (new Speech).say(readData).ssml()},
+        voice: {
+          languageCode: 'en-GB',
+          name: 'en-GB-Wavenet-C',
+        },
+        audioConfig: {
+          audioEncoding: 'MP3',
+          pitch: "0.00",
+          speakingRate: "1.00"
+        },
+      });
+    } else {
+      throw new Error("Audiocast exists.")
+    }
   })
   .catch(err => {
     if (err.toString() === charLimitError) {
@@ -84,16 +93,24 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
     }
     console.error("Synthesize Speech: " + err.toString());
   })
-  .then(responses => { 
-    tempAudioFile = path.join(os.tmpdir(), audioFileName);      
-    const writeFile = util.promisify(fs.writeFile);
-    return writeFile(tempAudioFile, responses[0].audioContent, 'binary')
+  .then(responses => {
+    if (exists === false) { 
+      tempAudioFile = path.join(os.tmpdir(), audioFileName);      
+      const writeFile = util.promisify(fs.writeFile);
+      return writeFile(tempAudioFile, responses[0].audioContent, 'binary')
+    } else {
+      throw new Error("Audiocast exists.")
+    }
   })
   .catch(err => {
     console.error("Write Temporary Audio File Error: " + err);
   })
   .then(() => {
-    return bucket.upload(tempAudioFile, { destination: audioFilePath })
+    if (exists === false) {
+      return bucket.upload(tempAudioFile, { destination: audioFilePath })
+    } else {
+      throw new Error("Audiocast exists.") 
+    }
   })
   .catch(err => {
     console.error('Upload Audio to GCS Error: ' + err);
