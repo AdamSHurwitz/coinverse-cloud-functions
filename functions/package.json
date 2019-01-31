@@ -18,7 +18,7 @@
     "ssml-builder": "^0.4.3"
   },
   "devDependencies": {
-    "eslint": "^4.12.0",
+    "eslint": "^5.12.0",
     "eslint-plugin-promise": "^3.6.0"
   },
   "private": true,

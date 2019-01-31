@@ -7,13 +7,15 @@ const util = require('util');
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
 const {Storage} = require('@google-cloud/storage');
-
 const charLimitError = "Error: 3 INVALID_ARGUMENT: 5000 characters limit exceeded."
+const promise = (promise) => promise
+  .then(data => [null, data])
+  .catch(error => [error, null]);
 
 admin.initializeApp(); 
 
-// Converts and saves article text into audio.
-exports.getAudiocast = functions.https.onCall((data, context) => {
+// Converts and saves article text into audiocast.
+exports.getAudiocast = functions.https.onCall(async (data, context) => {
   var storage;
   var bucket;
   if (data.debugEnabled === true) {
@@ -32,93 +34,63 @@ exports.getAudiocast = functions.https.onCall((data, context) => {
   var tempTextFile;
   var tempAudioFile;
   var errorMessage;
+  
+  // Check if audiocast exists.
+  const [fileExistsError, fileExists] = await promise(bucket.file(audioFilePath).exists())
+  if (fileExistsError) {
+    console.error("Check if file exists error: " + fileExistsError);
+    return { error: fileExistsError }
+  }
+  exists = fileExists[0];
+  console.log("Article " + data.id + " exists: " + exists)
+  if (exists) return { filePath: audioFilePath }
+  tempTextFile = path.join(os.tmpdir(), textFileName); 
 
-  return bucket.file(audioFilePath).exists()
-  .catch(err => {
-    console.error("Check if file exists error: " + err);
-  })
-  .then(currentData => {
-    exists = currentData[0];
-    console.log("Article " + data.id + " exists: " + exists)
-    if (exists) {
-      return { 
-        filePath: audioFilePath, 
-        error: errorMessage 
-       }
-    } else {
-      tempTextFile = path.join(os.tmpdir(), textFileName); 
-      return bucket.file(textFilePath).download({
-        destination: tempTextFile,
-      });
+  // Download content text.
+  const [downloadTextFileError] = await promise(
+    bucket.file(textFilePath).download({ destination: tempTextFile,})
+  )
+  if (downloadTextFileError) {
+    console.error("Download text file error: " + downloadTextFileError);
+    return { error: downloadTextFileError }
+  }
+    
+  // Read content text.
+  const readFile = util.promisify(fs.readFile);
+  const [readTextFileError, textFileData] = await promise(readFile(tempTextFile, 'utf8'))
+  if (readTextFileError) {
+    console.error("Read text file error: " + readTextFileError);
+    return { error: readTextFileError }
+  }
+
+  // Convert text to audiocast.
+  const [textToSpeechError, textToSpeechResponse] = await promise(
+    new textToSpeech.TextToSpeechClient().synthesizeSpeech({
+      input: { ssml: (new Speech).say(textFileData).ssml()},
+      voice: { languageCode: 'en-GB', name: 'en-GB-Wavenet-C',},
+      audioConfig: { audioEncoding: 'MP3', pitch: "0.00", speakingRate: "1.00"},
+    }))
+    if (textToSpeechError) {
+      if (textToSpeechError.toString() === charLimitError) {
+        console.error("Synthesize Speech: " + textToSpeechError);
+        return { error: "TTS_CHAR_LIMIT_ERROR" }
+      }
     }
-  })
-  .catch(err => {
-    console.error("Download text file error: " + err);
-  })
-  .then(() => {
-    if (exists === false) {
-      console.log('Text downloaded to', tempTextFile);
-      const readFile = util.promisify(fs.readFile);
-      return readFile(tempTextFile, 'utf8');
-    } else {
-      throw new Error("Audiocast exists.")
+    
+    // Write audiocast to mp3. 
+    tempAudioFile = path.join(os.tmpdir(), audioFileName);      
+    const writeFile = util.promisify(fs.writeFile);
+    const [writeAudioFileError] = await promise(writeFile(tempAudioFile, textToSpeechResponse[0].audioContent, 'binary'))
+    if (writeAudioFileError) {
+      console.error("Write Temporary Audio File Error: " + writeAudioFileError);
+      return { error: writeAudioFileError }
     }
-  })
-  .catch(err => {
-    console.error("Read " + tempTextFile + ": " + err);
-  })
-  .then((readData) => {
-    //TODO: Improve SSML.
-    if (exists === false) {
-      console.log('Convert Article ' + data.id + ': ' + readData);
-      return new textToSpeech.TextToSpeechClient().synthesizeSpeech({
-        input: { ssml: (new Speech).say(readData).ssml()},
-        voice: {
-          languageCode: 'en-GB',
-          name: 'en-GB-Wavenet-C',
-        },
-        audioConfig: {
-          audioEncoding: 'MP3',
-          pitch: "0.00",
-          speakingRate: "1.00"
-        },
-      });
-    } else {
-      throw new Error("Audiocast exists.")
+
+    // Upload audiocast mp3 to Cloud Storage.
+    const [uploadAudioFileError] = await promise(bucket.upload(tempAudioFile, { destination: audioFilePath }))
+    if (uploadAudioFileError) {
+      console.error('Upload Audio to GCS Error: ' + uploadAudioFileError);
+      return { error: uploadAudioFileError }
     }
-  })
-  .catch(err => {
-    if (err.toString() === charLimitError) {
-      errorMessage = "TTS_CHAR_LIMIT_ERROR";
-    }
-    console.error("Synthesize Speech: " + err.toString());
-  })
-  .then(responses => {
-    if (exists === false) { 
-      tempAudioFile = path.join(os.tmpdir(), audioFileName);      
-      const writeFile = util.promisify(fs.writeFile);
-      return writeFile(tempAudioFile, responses[0].audioContent, 'binary')
-    } else {
-      throw new Error("Audiocast exists.")
-    }
-  })
-  .catch(err => {
-    console.error("Write Temporary Audio File Error: " + err);
-  })
-  .then(() => {
-    if (exists === false) {
-      return bucket.upload(tempAudioFile, { destination: audioFilePath })
-    } else {
-      throw new Error("Audiocast exists.") 
-    }
-  })
-  .catch(err => {
-    console.error('Upload Audio to GCS Error: ' + err);
-  })
-  .then(() => {
-    return { 
-      filePath: audioFilePath, 
-      error: errorMessage 
-    }
-  })
+    return { filePath: audioFilePath, error: uploadAudioFileError }
 });
