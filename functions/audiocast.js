@@ -12,7 +12,7 @@ const promise = (promise) => promise
   .catch(error => [error, null]);
 
 // Converts and saves article text into audiocast.
-exports.handler = functions.https.onCall(async (data, context) => {
+exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
     var storage;
     var bucket;
     if (data.debugEnabled === true) {

@@ -12,7 +12,7 @@ const promise = (promise) => promise
  *
  * @param {string} data.path the document or collection path to delete.
  */
-exports.handler = functions.runWith({timeoutSeconds: 540, memory: '2GB'})
+exports.deleteUser = () => functions.runWith({timeoutSeconds: 540, memory: '2GB'})
   .https.onCall((data, context) => {
     if (context.auth.uid !== data.userId)
       throw new functions.https.HttpsError(
