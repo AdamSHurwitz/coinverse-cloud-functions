@@ -15,6 +15,8 @@ const promise = (promise) => promise
 
 admin.initializeApp(); 
 
+//TODO: Add audiocast.js and user.js.
+
 // Converts and saves article text into audiocast.
 exports.getAudiocast = functions.https.onCall(async (data, context) => {
   var storage;
@@ -104,7 +106,7 @@ exports.getAudiocast = functions.https.onCall(async (data, context) => {
  *
  * @param {string} data.path the document or collection path to delete.
  */
-exports.recursiveDelete = functions
+exports.deleteUser = functions
   .runWith({timeoutSeconds: 540, memory: '2GB'})
   .https.onCall((data, context) => {
     if (context.auth.uid !== data.userId)
