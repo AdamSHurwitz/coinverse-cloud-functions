@@ -6,6 +6,7 @@ const fs = require('fs');
 const util = require('util');
 const admin = require('firebase-admin');
 const functions = require('firebase-functions');
+const firebase_tools = require('firebase-tools');
 const {Storage} = require('@google-cloud/storage');
 const charLimitError = "Error: 3 INVALID_ARGUMENT: 5000 characters limit exceeded."
 const promise = (promise) => promise
@@ -94,3 +95,27 @@ exports.getAudiocast = functions.https.onCall(async (data, context) => {
     }
     return { filePath: audioFilePath, error: uploadAudioFileError }
 });
+
+/**
+ * Initiate a recursive delete of documents at a given path.
+ *
+ * This delete is NOT an atomic operation and it's possible
+ * that it may fail after only deleting some documents.
+ *
+ * @param {string} data.path the document or collection path to delete.
+ */
+exports.recursiveDelete = functions
+  .runWith({timeoutSeconds: 540, memory: '2GB'})
+  .https.onCall((data, context) => {
+    if (context.auth.uid !== data.userId)
+      throw new functions.https.HttpsError(
+        'permission-denied','Must be an administrative user to initiate delete.');
+    const path = data.path;
+    console.log(`User ${context.auth.uid} has requested to delete path ${path}`);
+    return firebase_tools.firestore.delete(path, {
+      project: process.env.GCLOUD_PROJECT,
+      recursive: true,
+      yes: true,
+      token: functions.config().fb.token
+    }).then(() => { return { path: path }; });
+  });
