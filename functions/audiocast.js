@@ -15,14 +15,27 @@ const promise = (promise) => promise
 exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
     var storage;
     var bucket;
-    if (data.debugEnabled === true) {
-      storage = new Storage({ projectId: 'coinverse-media-staging' });
-      bucket = storage.bucket('gs://coinverse-media-staging.appspot.com');
-    } else {
-      storage = new Storage({ projectId: 'carpecoin-media-211903' });
-      bucket = storage.bucket('gs://carpecoin-media-211903.appspot.com');    
+    switch(data.buildTypeParam) {
+      case 'debug': 
+        storage = new Storage({ projectId: 'coinverse-media-staging' });
+        bucket = storage.bucket('gs://coinverse-media-staging.appspot.com')
+        console.log('getAudiocast - debug')
+        break;  
+      case 'release':
+        storage = new Storage({ projectId: 'carpecoin-media-211903' });
+        bucket = storage.bucket('gs://carpecoin-media-211903.appspot.com');   
+        console.log('getAudiocast - release')
+        break;
+      case 'open':
+          storage = new Storage({ projectId: 'coinverse-open' });
+          bucket = storage.bucket('gs://coinverse-open.appspot.com');   
+          console.log('getAudiocast - open')
+          break;
+      default: 
+        storage = new Storage({ projectId: 'coinverse-media-staging' });
+        bucket = storage.bucket('gs://coinverse-media-staging.appspot.com');  
+        console.log('getAudiocast - default')
     }
-  
     var exists;
     var textFileName = data.id + '.txt';
     var textFilePath = "content/feeds/en/text/" + textFileName;

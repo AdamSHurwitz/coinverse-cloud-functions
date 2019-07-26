@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "@google-cloud/logging": "^4.1.1",
-    "@google-cloud/storage": "^2.3.1",
+    "@google-cloud/storage": "^2.5.0",
     "@google-cloud/text-to-speech": "^0.3.0",
-    "firebase-admin": "~6.0.0",
-    "firebase-functions": "^2.1.0",
+    "firebase-admin": "^8.3.0",
+    "firebase-functions": "^3.2.0",
     "firebase-tools": "^6.3.1",
     "ssml-builder": "^0.4.3"
   },
@@ -24,6 +24,6 @@
   },
   "private": true,
   "engines": {
-    "node": "8"
+    "node": "10"
   }
 }
