@@ -27,10 +27,10 @@ exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
         console.log('getAudiocast - release')
         break;
       case 'open':
-          storage = new Storage({ projectId: 'coinverse-open' });
-          bucket = storage.bucket('gs://coinverse-open.appspot.com');   
-          console.log('getAudiocast - open')
-          break;
+        storage = new Storage({ projectId: 'coinverse-open' });
+        bucket = storage.bucket('gs://coinverse-open.appspot.com');   
+        console.log('getAudiocast - open')
+        break;
       default: 
         storage = new Storage({ projectId: 'coinverse-media-staging' });
         bucket = storage.bucket('gs://coinverse-media-staging.appspot.com');  
@@ -52,8 +52,12 @@ exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
       return { error: fileExistsError }
     }
     exists = fileExists[0];
-    console.log("Article " + data.id + " exists: " + exists)
-    if (exists) return { filePath: audioFilePath }
+    console.log("Article: " + data.id + " exists: " + exists)
+    if (exists) {
+      console.log("Article: " + data.id + " return: " + audioFilePath)
+      return { filePath: audioFilePath }
+    }
+    console.log("Article: " + data.id + " create: " + textFileName)
     tempTextFile = path.join(os.tmpdir(), textFileName); 
   
     // Download content text.
@@ -63,7 +67,8 @@ exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
     if (downloadTextFileError) {
       console.error("Download text file error: " + downloadTextFileError);
       return { error: downloadTextFileError }
-    }
+    } 
+    console.log("Download text: " + data.id + " download text: " + textFilePath)
       
     // Read content text.
     const readFile = util.promisify(fs.readFile);
@@ -72,6 +77,7 @@ exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
       console.error("Read text file error: " + readTextFileError);
       return { error: readTextFileError }
     }
+    console.log("Read text file: " + data.id + " read text: success")
   
     // Convert text to audiocast.
     const [textToSpeechError, textToSpeechResponse] = await promise(
@@ -81,11 +87,10 @@ exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
         audioConfig: { audioEncoding: 'MP3', pitch: "0.00", speakingRate: "1.00"},
       }))
       if (textToSpeechError) {
-        if (textToSpeechError.toString() === charLimitError) {
-          console.error("Synthesize Speech: " + textToSpeechError);
-          return { error: "TTS_CHAR_LIMIT_ERROR" }
-        }
+        console.error("Synthesize Speech error: " + textToSpeechError + " response: " + textToSpeechResponse);
+        if (textToSpeechError.toString() === charLimitError) return { error: "TTS_CHAR_LIMIT_ERROR" }
       }
+      console.log("Synthesize Speech: " + textToSpeechResponse);
       
       // Write audiocast to mp3. 
       tempAudioFile = path.join(os.tmpdir(), audioFileName);      
@@ -95,6 +100,7 @@ exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
         console.error("Write Temporary Audio File Error: " + writeAudioFileError);
         return { error: writeAudioFileError }
       }
+      console.log("Write Temporary Audio File: " + audioFileName);
   
       // Upload audiocast mp3 to Cloud Storage.
       const [uploadAudioFileError] = await promise(bucket.upload(tempAudioFile, { destination: audioFilePath }))
@@ -102,5 +108,6 @@ exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
         console.error('Upload Audio to GCS Error: ' + uploadAudioFileError);
         return { error: uploadAudioFileError }
       }
+      console.log("Upload Audio to GCS: " + audioFilePath);
       return { filePath: audioFilePath, error: uploadAudioFileError }
   });
