@@ -82,7 +82,9 @@ exports.getAudiocast = () => functions.https.onCall(async (data, context) => {
     // Convert text to audiocast.
     const [textToSpeechError, textToSpeechResponse] = await promise(
       new textToSpeech.TextToSpeechClient().synthesizeSpeech({
-        input: { ssml: (new Speech).say(textFileData).ssml()},
+        // TODO - Re-implement once bug is fixed https://github.com/googleapis/nodejs-text-to-speech/issues/252
+        //input: { ssml: (new Speech).say(textFileData).ssml()}  
+        input: { text: (new Speech).say(textFileData).ssml()},
         voice: { languageCode: 'en-GB', name: 'en-GB-Wavenet-C',},
         audioConfig: { audioEncoding: 'MP3', pitch: "0.00", speakingRate: "1.00"},
       }))
